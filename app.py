@@ -35,23 +35,30 @@ def init_db():
     conn.commit()
     conn.close()
 
-BOOKS_PER_PAGE = 10
+#BOOKS_PER_PAGE = 10
 
 @app.route('/')
 def index():
-    # Get the page number from the query parameter, default to 1 if not provided
+    # Get the current page from the query string, default to 1 if not present
     page = request.args.get('page', 1, type=int)
-    offset = (page - 1) * BOOKS_PER_PAGE
+    per_page = 10  # Limit to 10 books per page
 
+    # Connect to the database
     conn = get_db_connection()
-    books = conn.execute('SELECT * FROM books LIMIT ? OFFSET ?', (BOOKS_PER_PAGE, offset)).fetchall()
+    
+    # Fetch books for the current page
+    books = conn.execute('SELECT * FROM books LIMIT ? OFFSET ?', (per_page, (page - 1) * per_page)).fetchall()
+    
+    # Get total number of books in the database for pagination
     total_books = conn.execute('SELECT COUNT(*) FROM books').fetchone()[0]
     conn.close()
 
-    # Calculate the total number of pages
-    total_pages = (total_books // BOOKS_PER_PAGE) + (1 if total_books % BOOKS_PER_PAGE else 0)
+    # Calculate total number of pages
+    total_pages = (total_books // per_page) + (1 if total_books % per_page > 0 else 0)
 
+    # Return the template with the necessary data
     return render_template('index.html', books=books, page=page, total_pages=total_pages)
+
 
 @app.route('/add', methods=['GET', 'POST'])
 def add():
@@ -103,7 +110,7 @@ def buy(book_id):
     book = conn.execute('SELECT * FROM books WHERE id = ?', (book_id,)).fetchone()
     conn.close()
     if book:
-        return f"<h1>Thanks for buying <i>{book['title']}</i>!</h1><a href='/'>← Back to store</a>"
+        return render_template('payment.html',book=book)
     else:
         return "<h1>Book not found.</h1><a href='/'>← Back</a>"
 
@@ -116,11 +123,17 @@ def delete(book_id):
     conn.close()
     return redirect('/')
 
-@app.route('/payment', methods=['POST'])
+
+@app.route('/payment', methods=['GET', 'POST'])
 def payment():
-    # In a real application, you would process the payment here
-    # For now, we'll just display a mock confirmation
-    return redirect('/payment_confirmation')
+        # In a real application, you would process the payment here
+        # For now, we'll just display a confirmation
+    return render_template('payment.html')
+
+@app.route('/checkout')
+def checkout():
+    return render_template('payment.html')
+
 
 @app.route('/payment_confirmation')
 def payment_confirmation():
